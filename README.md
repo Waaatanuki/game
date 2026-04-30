@@ -8,7 +8,9 @@
 - Element Plus 按需解析
 - Vue API 自动导入
 - Vue 组件自动注册
-- @ 指向 src 的路径别名
+- UnoCSS 原子化样式
+- UnoCSS 官方 Reset
+- ~ 指向 src 的路径别名
 - Antfu Flat ESLint 配置
 
 ## 常用命令
@@ -23,4 +25,4 @@ pnpm build
 
 ## 说明
 
-自动导入声明文件位于项目根目录的 auto-imports.d.ts 与 components.d.ts。
+自动导入声明文件位于 types 目录下的 auto-imports.d.ts 与 components.d.ts。

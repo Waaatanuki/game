@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import Unocss from '@unocss/vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
@@ -11,18 +12,19 @@ export default defineConfig({
     vue(),
     AutoImport({
       imports: ['vue'],
-      dts: 'auto-imports.d.ts',
+      dts: 'types/auto-imports.d.ts',
       vueTemplate: true,
       resolvers: [ElementPlusResolver()],
     }),
     Components({
-      dts: 'components.d.ts',
+      dts: 'types/components.d.ts',
       resolvers: [ElementPlusResolver()],
     }),
+    Unocss(),
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '~': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
 })
