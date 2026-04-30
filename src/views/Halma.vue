@@ -1,19 +1,38 @@
 <script setup lang="ts">
-import type { Stone } from '~/games/gomoku/logic'
-import { aiMove, BOARD_SIZE, checkWin, createBoard, isFull } from '~/games/gomoku/logic'
+import type { AIMove, Pos, Stone } from '~/games/halma/logic'
+import {
+  aiMove,
+  checkWin,
+  createBoard,
+  PLAYER1_HOME,
+  PLAYER2_HOME,
+  reachableJumps,
+  SIZE,
+  stepTargets,
+} from '~/games/halma/logic'
 
 type GameMode = 'pvp-local' | 'pve' | 'online'
-type GameStatus = 'playing' | 'win' | 'draw'
+type Status = 'playing' | 'win'
+
+interface Piece {
+  id: number
+  stone: Stone
+  r: number
+  c: number
+  hopping: boolean
+}
 
 const mode = ref<GameMode>('pvp-local')
 const board = ref(createBoard())
-const current = ref<Stone>(1) // 1=黑 2=白
-const status = ref<GameStatus>('playing')
-const winLine = ref<Array<[number, number]>>([])
-const lastMove = ref<[number, number] | null>(null)
-const moveCount = ref(0)
+const pieces = ref<Piece[]>([])
+const current = ref<Stone>(1)
+const status = ref<Status>('playing')
+const winner = ref<Stone>(0)
 
-const aiSelf = ref<Stone>(2) // AI 默认执白
+const selected = ref<Pos | null>(null)
+const animating = ref(false)
+
+const aiSelf = ref<Stone>(2) // AI 默认执蓝
 const aiThinking = ref(false)
 
 const rtc = useWebRTC()
@@ -22,19 +41,7 @@ const onlineCanMove = computed(() => rtc.status.value === 'connected' && current
 
 const joinRoomInput = ref('')
 
-const stats = reactive({
-  black: 0,
-  white: 0,
-  draw: 0,
-})
-
-const turnLabel = computed(() => {
-  if (status.value === 'win')
-    return `${current.value === 1 ? '黑' : '白'}方胜出 🎉`
-  if (status.value === 'draw')
-    return '和棋'
-  return `${current.value === 1 ? '黑' : '白'}方落子`
-})
+const stats = reactive({ red: 0, blue: 0 })
 
 const modeOptions: Array<{ value: GameMode, label: string }> = [
   { value: 'pvp-local', label: '本地双人' },
@@ -42,78 +49,175 @@ const modeOptions: Array<{ value: GameMode, label: string }> = [
   { value: 'online', label: '联机对战' },
 ]
 
-function newGame() {
-  board.value = createBoard()
-  current.value = 1
-  status.value = 'playing'
-  winLine.value = []
-  lastMove.value = null
-  moveCount.value = 0
-  aiThinking.value = false
+function initPieces() {
+  let id = 0
+  const list: Piece[] = []
+  for (const [r, c] of PLAYER1_HOME)
+    list.push({ id: id++, stone: 1, r, c, hopping: false })
+  for (const [r, c] of PLAYER2_HOME)
+    list.push({ id: id++, stone: 2, r, c, hopping: false })
+  pieces.value = list
 }
 
-function applyMove(r: number, c: number, stone: Stone): boolean {
-  if (status.value !== 'playing')
-    return false
-  if (board.value[r][c] !== 0)
-    return false
-  // 创建新引用以触发响应式
-  const next = board.value.map(row => row.slice()) as typeof board.value
-  next[r][c] = stone
-  board.value = next
-  lastMove.value = [r, c]
-  moveCount.value++
+const stepSet = computed<Set<string>>(() => {
+  if (!selected.value)
+    return new Set()
+  const [r, c] = selected.value
+  return new Set(stepTargets(board.value, r, c).map(([sr, sc]) => `${sr},${sc}`))
+})
 
-  const line = checkWin(board.value, r, c)
-  if (line) {
+const jumpMap = computed<Map<string, Pos[]>>(() => {
+  if (!selected.value)
+    return new Map()
+  const [r, c] = selected.value
+  return reachableJumps(board.value, r, c)
+})
+
+function isStepTarget(r: number, c: number) {
+  return stepSet.value.has(`${r},${c}`)
+}
+function isJumpTarget(r: number, c: number) {
+  return jumpMap.value.has(`${r},${c}`)
+}
+
+function isHome(stone: Stone, r: number, c: number) {
+  const home = stone === 1 ? PLAYER1_HOME : PLAYER2_HOME
+  return home.some(([hr, hc]) => hr === r && hc === c)
+}
+
+function isSelected(r: number, c: number) {
+  return !!selected.value && selected.value[0] === r && selected.value[1] === c
+}
+
+function findPiece(r: number, c: number) {
+  return pieces.value.find(p => p.r === r && p.c === c)
+}
+
+function commitMove(fr: number, fc: number, tr: number, tc: number) {
+  const next = board.value.map(row => row.slice()) as typeof board.value
+  next[tr][tc] = next[fr][fc]
+  next[fr][fc] = 0
+  board.value = next
+}
+
+function endTurn() {
+  selected.value = null
+  const w = checkWin(board.value)
+  if (w) {
     status.value = 'win'
-    winLine.value = line
-    if (stone === 1)
-      stats.black++
+    winner.value = w
+    if (w === 1)
+      stats.red++
     else
-      stats.white++
-    const winnerName = stone === 1 ? '黑方' : '白方'
+      stats.blue++
+    const winnerName = w === 1 ? '红方' : '蓝方'
     let extra = ''
     if (mode.value === 'pve')
-      extra = stone === aiSelf.value ? '（AI 获胜）' : '（你赢了）'
+      extra = w === aiSelf.value ? '（AI 获胜）' : '（你赢了）'
     else if (mode.value === 'online' && rtc.status.value === 'connected')
-      extra = stone === onlineMyStone.value ? '（你赢了）' : '（对手获胜）'
+      extra = w === onlineMyStone.value ? '（你赢了）' : '（对手获胜）'
     ElMessage.success(`${winnerName}胜出 🎉${extra}`)
-    return true
+    return
   }
-  if (isFull(board.value)) {
-    status.value = 'draw'
-    stats.draw++
-    ElMessage.info('和棋')
-    return true
-  }
-  current.value = stone === 1 ? 2 : 1
-  return true
+  current.value = current.value === 1 ? 2 : 1
+  if (mode.value === 'pve')
+    triggerAIIfNeeded()
 }
 
-function handleCellClick(r: number, c: number) {
-  if (status.value !== 'playing')
-    return
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
-  if (mode.value === 'pve') {
-    if (current.value === aiSelf.value || aiThinking.value)
+async function playStep(piece: Piece, tr: number, tc: number) {
+  animating.value = true
+  const fr = piece.r
+  const fc = piece.c
+  piece.r = tr
+  piece.c = tc
+  await wait(260)
+  commitMove(fr, fc, tr, tc)
+  animating.value = false
+  endTurn()
+}
+
+async function playJump(piece: Piece, path: Pos[]) {
+  animating.value = true
+  let fr = piece.r
+  let fc = piece.c
+  for (const [tr, tc] of path) {
+    piece.hopping = false
+    await nextTick()
+    piece.r = tr
+    piece.c = tc
+    piece.hopping = true
+    await wait(360)
+    commitMove(fr, fc, tr, tc)
+    fr = tr
+    fc = tc
+  }
+  piece.hopping = false
+  animating.value = false
+  endTurn()
+}
+
+/** 局部执行一段动作（不广播） */
+async function performMove(from: Pos, path: Pos[], kind: 'step' | 'jump') {
+  const piece = findPiece(from[0], from[1])
+  if (!piece)
+    return
+  if (kind === 'step') {
+    const [tr, tc] = path[0]
+    await playStep(piece, tr, tc)
+  }
+  else {
+    await playJump(piece, path)
+  }
+}
+
+function handleClick(r: number, c: number) {
+  if (status.value !== 'playing' || animating.value)
+    return
+  if (mode.value === 'pve' && (current.value === aiSelf.value || aiThinking.value))
+    return
+  if (mode.value === 'online' && !onlineCanMove.value) {
+    if (rtc.status.value === 'connected')
+      ElMessage.warning('还未轮到你')
+    return
+  }
+
+  const cell = board.value[r][c]
+  const myStone
+    = mode.value === 'online' ? onlineMyStone.value : current.value
+
+  // 选自己的棋子；若再次点击已选中的棋子则取消
+  if (cell === myStone) {
+    if (mode.value === 'online' && current.value !== myStone)
       return
-    applyMove(r, c, current.value)
-    triggerAIIfNeeded()
+    if (isSelected(r, c)) {
+      selected.value = null
+      return
+    }
+    selected.value = [r, c]
     return
   }
 
-  if (mode.value === 'online') {
-    if (!onlineCanMove.value)
-      return ElMessage.warning('还未轮到你或连接未就绪')
-    const stone = onlineMyStone.value
-    if (applyMove(r, c, stone))
-      rtc.send({ type: 'move', payload: { r, c, stone } })
+  if (!selected.value || cell !== 0)
+    return
+  const [sr, sc] = selected.value
+
+  if (isStepTarget(r, c)) {
+    const path: Pos[] = [[r, c]]
+    if (mode.value === 'online')
+      rtc.send({ type: 'move', payload: { from: [sr, sc], path, kind: 'step' } })
+    performMove([sr, sc], path, 'step')
     return
   }
-
-  // 本地双人
-  applyMove(r, c, current.value)
+  const path = jumpMap.value.get(`${r},${c}`)
+  if (path && path.length) {
+    if (mode.value === 'online')
+      rtc.send({ type: 'move', payload: { from: [sr, sc], path, kind: 'jump' } })
+    performMove([sr, sc], path, 'jump')
+  }
 }
 
 function triggerAIIfNeeded() {
@@ -122,26 +226,46 @@ function triggerAIIfNeeded() {
   if (current.value !== aiSelf.value)
     return
   aiThinking.value = true
-  setTimeout(() => {
-    const move = aiMove(board.value, aiSelf.value)
-    if (move)
-      applyMove(move[0], move[1], aiSelf.value)
+  setTimeout(async () => {
+    const move: AIMove | null = aiMove(board.value, aiSelf.value)
     aiThinking.value = false
-  }, 220)
+    if (!move)
+      return endTurn()
+    await performMove(move.from, move.path, move.kind)
+  }, 260)
+}
+
+function newGame() {
+  board.value = createBoard()
+  initPieces()
+  current.value = 1
+  status.value = 'playing'
+  winner.value = 0
+  selected.value = null
+  animating.value = false
+  aiThinking.value = false
+  if (mode.value === 'pve')
+    triggerAIIfNeeded()
+}
+
+function requestReset() {
+  if (mode.value === 'online') {
+    if (rtc.status.value !== 'connected')
+      return ElMessage.warning('未连接，无法同步重开')
+    rtc.send({ type: 'reset' })
+  }
+  newGame()
 }
 
 watch(mode, () => {
   newGame()
   if (mode.value !== 'online')
     rtc.reset()
-  if (mode.value === 'pve')
-    triggerAIIfNeeded()
 })
 
 watch(aiSelf, () => {
   if (mode.value === 'pve') {
     newGame()
-    triggerAIIfNeeded()
   }
 })
 
@@ -153,25 +277,15 @@ watch(
   },
 )
 
-// 联机消息处理
 rtc.onMessage((msg) => {
   if (msg.type === 'move') {
-    const p = msg.payload as { r: number, c: number, stone: Stone }
-    applyMove(p.r, p.c, p.stone)
+    const p = msg.payload as { from: Pos, path: Pos[], kind: 'step' | 'jump' }
+    performMove(p.from, p.path, p.kind)
   }
   else if (msg.type === 'reset') {
     newGame()
   }
 })
-
-function requestReset() {
-  if (mode.value === 'online') {
-    if (rtc.status.value !== 'connected')
-      return ElMessage.warning('未连接，无法同步重开')
-    rtc.send({ type: 'reset' })
-  }
-  newGame()
-}
 
 async function copyText(text: string) {
   try {
@@ -183,9 +297,13 @@ async function copyText(text: string) {
   }
 }
 
-onMounted(() => {
-  newGame()
+const turnLabel = computed(() => {
+  if (status.value === 'win')
+    return `${winner.value === 1 ? '红' : '蓝'}方胜出 🎉`
+  return `${current.value === 1 ? '红' : '蓝'}方行动`
 })
+
+onMounted(newGame)
 </script>
 
 <template>
@@ -193,10 +311,10 @@ onMounted(() => {
     <header class="mb-5 flex items-center justify-between gap-3">
       <div>
         <p class="m-0 text-xs text-[color:var(--app-text-muted)] font-bold tracking-[0.18em] uppercase">
-          Gomoku · 五子棋
+          Halma · 跳棋
         </p>
         <h1 class="m-0 text-2xl text-[color:var(--app-text)] sm:text-3xl">
-          15×15 · 五连即胜
+          9×9 · 占领对方大本营
         </h1>
       </div>
       <el-button text @click="$router.push('/')">
@@ -209,22 +327,40 @@ onMounted(() => {
 
     <div class="grid gap-5 lg:grid-cols-[auto_1fr]">
       <section class="board-wrap">
-        <div class="board" :style="{ '--size': BOARD_SIZE }">
+        <div class="board" :style="{ '--size': SIZE }">
           <template v-for="(row, r) in board" :key="r">
-            <button
-              v-for="(cell, c) in row"
+            <div
+              v-for="(_cell, c) in row"
               :key="`${r}-${c}`"
               class="cell"
               :class="{
-                'cell-last': lastMove && lastMove[0] === r && lastMove[1] === c,
-                'cell-win': winLine.some(p => p[0] === r && p[1] === c),
+                'home-red': isHome(1, r, c),
+                'home-blue': isHome(2, r, c),
+                'is-target-step': isStepTarget(r, c),
+                'is-target-jump': isJumpTarget(r, c),
+                'is-selected': isSelected(r, c),
               }"
-              :disabled="status !== 'playing' || cell !== 0"
-              @click="handleCellClick(r, c)"
-            >
-              <span v-if="cell" class="stone" :class="cell === 1 ? 'stone-black' : 'stone-white'" />
-            </button>
+              @click="handleClick(r, c)"
+            />
           </template>
+          <div class="pieces-layer">
+            <span
+              v-for="p in pieces"
+              :key="p.id"
+              class="piece"
+              :style="{
+                transform: `translate(calc((var(--cell) + var(--gap)) * ${p.c} + var(--cell) * 0.11), calc((var(--cell) + var(--gap)) * ${p.r} + var(--cell) * 0.11))`,
+              }"
+            >
+              <span
+                class="piece-inner"
+                :class="[
+                  p.stone === 1 ? 'piece-red' : 'piece-blue',
+                  { 'is-hopping': p.hopping },
+                ]"
+              />
+            </span>
+          </div>
         </div>
       </section>
 
@@ -239,7 +375,7 @@ onMounted(() => {
                 </el-tag>
               </div>
               <el-tag
-                :type="status === 'win' ? 'success' : status === 'draw' ? 'info' : 'warning'"
+                :type="status === 'win' ? 'success' : 'warning'"
                 effect="light"
                 round
               >
@@ -247,32 +383,26 @@ onMounted(() => {
               </el-tag>
             </div>
           </template>
-          <div class="grid grid-cols-3 gap-3 text-center">
+
+          <div class="grid grid-cols-2 gap-3 text-center">
             <div class="rounded-xl bg-[color:var(--app-surface-soft)] p-3">
               <div class="text-xs text-[color:var(--app-text-muted)]">
-                黑胜
+                红胜
               </div>
               <div class="mt-1 text-xl font-semibold">
-                {{ stats.black }}
+                {{ stats.red }}
               </div>
             </div>
             <div class="rounded-xl bg-[color:var(--app-surface-soft)] p-3">
               <div class="text-xs text-[color:var(--app-text-muted)]">
-                白胜
+                蓝胜
               </div>
               <div class="mt-1 text-xl font-semibold">
-                {{ stats.white }}
-              </div>
-            </div>
-            <div class="rounded-xl bg-[color:var(--app-surface-soft)] p-3">
-              <div class="text-xs text-[color:var(--app-text-muted)]">
-                和棋
-              </div>
-              <div class="mt-1 text-xl font-semibold">
-                {{ stats.draw }}
+                {{ stats.blue }}
               </div>
             </div>
           </div>
+
           <div class="mt-4 flex flex-wrap gap-2">
             <el-button type="primary" w-full @click="requestReset">
               <template #icon>
@@ -304,10 +434,10 @@ onMounted(() => {
             </div>
             <el-radio-group v-model="aiSelf">
               <el-radio-button :value="2">
-                AI 执白（你先手）
+                AI 执蓝（你先手）
               </el-radio-button>
               <el-radio-button :value="1">
-                AI 执黑（你后手）
+                AI 执红（你后手）
               </el-radio-button>
             </el-radio-group>
           </div>
@@ -348,7 +478,7 @@ onMounted(() => {
           />
 
           <p class="m-0 text-xs text-[color:var(--app-text-muted)] leading-[1.7]">
-            通过 WebRTC 端到端直连，使用公共信令服务器交换房号。主机执黑先手。
+            通过 WebRTC 端到端直连，使用公共信令服务器交换房号。主机执红先手。
           </p>
 
           <div v-if="!rtc.role.value" class="mt-3 flex flex-wrap gap-2">
@@ -366,7 +496,6 @@ onMounted(() => {
             </el-button>
           </div>
 
-          <!-- 主机视角：展示房号 -->
           <template v-if="rtc.role.value === 'host'">
             <div class="mt-4">
               <div class="room-id-pill">
@@ -374,7 +503,6 @@ onMounted(() => {
                   <span class="select-none font-mono">房号: {{ rtc.roomId.value }}</span>
                   <i ml-2 cursor-pointer text-base class="i-carbon-copy" @click="copyText(rtc.roomId.value)" />
                 </template>
-
                 <el-icon v-else class="is-loading">
                   <i class="i-carbon-circle-dash" />
                 </el-icon>
@@ -387,7 +515,6 @@ onMounted(() => {
             </div>
           </template>
 
-          <!-- 客机视角：输入房号 -->
           <template v-if="rtc.role.value === 'guest'">
             <div class="mt-2 fc gap-10">
               <el-input
@@ -421,7 +548,7 @@ onMounted(() => {
                 :closable="false"
                 show-icon
                 :title="`已加入房间 ${rtc.roomId.value}`"
-                description="你当前执白后手，可以开始对局。"
+                description="你当前执蓝后手，可以开始对局。"
               />
             </div>
           </template>
@@ -446,69 +573,96 @@ onMounted(() => {
   box-shadow: 0 24px 40px rgba(40, 23, 8, 0.18);
 }
 .board {
-  --cell: clamp(20px, 4.2vw, 36px);
-  --line: var(--gomoku-line);
+  --cell: clamp(28px, 5vw, 48px);
+  --gap: 4px;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(var(--size), var(--cell));
   grid-template-rows: repeat(var(--size), var(--cell));
-  position: relative;
-  background-color: var(--gomoku-board);
-  /* 网格线偏移到每个 cell 的中心，从而与按钮中心对齐 */
-  background-image:
-    linear-gradient(to right, var(--line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
-  background-size: var(--cell) var(--cell);
-  background-position: calc(var(--cell) / 2) calc(var(--cell) / 2);
-  background-repeat: repeat;
-  border-radius: 8px;
-  box-sizing: content-box;
+  gap: var(--gap);
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
 }
 .cell {
   width: var(--cell);
   height: var(--cell);
-  background: transparent;
-  border: 0;
-  padding: 0;
+  border-radius: 9999px;
+  background: var(--app-surface-soft);
   cursor: pointer;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transition:
+    transform 0.15s ease,
+    background 0.2s ease,
+    outline-color 0.2s ease;
+  outline: 2px solid transparent;
 }
-.cell:disabled {
-  cursor: default;
+.cell.home-red {
+  background: rgba(232, 84, 84, 0.18);
 }
-.cell:hover:not(:disabled)::after {
-  content: '';
+.cell.home-blue {
+  background: rgba(70, 132, 240, 0.18);
+}
+.cell.is-target-step {
+  background: rgba(120, 200, 130, 0.5);
+  outline: 2px dashed rgba(80, 160, 90, 0.8);
+}
+.cell.is-target-jump {
+  background: rgba(255, 196, 0, 0.5);
+  outline: 2px dashed rgba(255, 160, 0, 0.85);
+}
+.cell.is-selected {
+  transform: scale(1.05);
+  outline: 3px solid var(--app-accent);
+}
+.pieces-layer {
   position: absolute;
-  inset: 18%;
-  border-radius: 9999px;
-  background: var(--app-accent-soft);
+  top: 10px;
+  left: 10px;
+  width: calc(var(--cell) * var(--size) + var(--gap) * (var(--size) - 1));
+  height: calc(var(--cell) * var(--size) + var(--gap) * (var(--size) - 1));
+  pointer-events: none;
 }
-.cell-last .stone {
-  outline: 2px solid var(--app-accent);
-  outline-offset: 1px;
-}
-.cell-win .stone {
-  box-shadow:
-    0 0 0 3px rgba(255, 196, 0, 0.65),
-    0 0 18px rgba(255, 196, 0, 0.4);
-}
-.stone {
-  width: 78%;
-  height: 78%;
-  border-radius: 9999px;
+.piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--cell) * 0.78);
+  height: calc(var(--cell) * 0.78);
   display: block;
-  position: relative;
-  z-index: 1;
+  transform: translate(0, 0);
+  transition: transform 0.32s cubic-bezier(0.34, 1.2, 0.5, 1);
+  will-change: transform;
 }
-.stone-black {
-  background: radial-gradient(circle at 35% 30%, #555, #000 65%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+.piece-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transform-origin: 50% 80%;
 }
-.stone-white {
-  background: radial-gradient(circle at 35% 30%, #fff, #c8c8d0 75%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+.piece-inner.is-hopping {
+  animation: halma-hop 0.36s ease-in-out;
+}
+@keyframes halma-hop {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+  45% {
+    transform: translateY(-65%) scale(1.08);
+    box-shadow: 0 14px 14px rgba(0, 0, 0, 0.18);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+.piece-red {
+  background: radial-gradient(circle at 35% 30%, #ff8b8b, #c11919 70%);
+}
+.piece-blue {
+  background: radial-gradient(circle at 35% 30%, #88b6ff, #1c4cba 70%);
 }
 .room-id-pill {
   display: inline-flex;

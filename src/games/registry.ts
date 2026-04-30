@@ -28,6 +28,17 @@ export const games: GameMeta[] = [
     available: true,
   },
   {
+    id: 'halma',
+    name: '跳棋',
+    desc: '9×9 Halma 棋盘，支持本地双人、人机对战与基于 WebRTC 的联机对战，率先占满对方大本营者胜。',
+    icon: 'i-carbon-jump-link',
+    to: '/halma',
+    players: '1 - 2 人',
+    multiplayer: true,
+    accent: 'from-rose-400/60 to-blue-500/60',
+    available: true,
+  },
+  {
     id: 'snake',
     name: '贪吃蛇',
     desc: '即将上线，敬请期待。',

@@ -15,6 +15,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '五子棋' },
   },
   {
+    path: '/halma',
+    name: 'halma',
+    component: () => import('~/views/Halma.vue'),
+    meta: { title: '跳棋' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
