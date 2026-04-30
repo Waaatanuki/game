@@ -298,10 +298,7 @@ onMounted(() => {
             </el-radio>
           </el-radio-group>
 
-          <div v-if="mode === 'pve'" class="mt-4">
-            <div class="mb-2 text-sm text-[color:var(--app-text-muted)]">
-              选择 AI 持子
-            </div>
+          <div v-if="mode === 'pve'" class="mt-4 fc">
             <el-radio-group v-model="aiSelf">
               <el-radio-button :value="2">
                 AI 执白（你先手）

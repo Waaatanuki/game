@@ -52,12 +52,12 @@ export const games: GameMeta[] = [
   {
     id: 'tictactoe',
     name: '井字棋',
-    desc: '即将上线，敬请期待。',
+    desc: '经典 3×3 井字棋，支持本地双人、人机对战（完美 Minimax AI）与 WebRTC 联机对战。',
     icon: 'i-carbon-checkbox',
     to: '/tictactoe',
-    players: '2 人',
+    players: '1 - 2 人',
     multiplayer: true,
     accent: 'from-sky-400/60 to-indigo-500/60',
-    available: false,
+    available: true,
   },
 ]

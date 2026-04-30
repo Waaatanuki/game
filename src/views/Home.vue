@@ -28,7 +28,7 @@ const multi = games.filter(g => g.multiplayer).length
           挑一款小游戏，开始游玩
         </h1>
         <p class="hero-desc">
-          首页是所有小游戏的列表，点击任意一款即可进入对应界面。多人游戏通过 WebRTC 直连完成，无需服务器。
+          点击任意一款即可进入对应界面。多人游戏通过 WebRTC 直连完成，无需服务器。
         </p>
 
         <div class="mt-6 flex flex-wrap gap-3">

@@ -27,6 +27,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '数独' },
   },
   {
+    path: '/tictactoe',
+    name: 'tictactoe',
+    component: () => import('~/views/TicTacToe.vue'),
+    meta: { title: '井字棋' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },

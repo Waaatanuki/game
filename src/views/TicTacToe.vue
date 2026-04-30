@@ -1,38 +1,18 @@
 <script setup lang="ts">
-import type { AIMove, Pos, Stone } from '~/games/halma/logic'
-import {
-  aiMove,
-  checkWin,
-  createBoard,
-  PLAYER1_HOME,
-  PLAYER2_HOME,
-  reachableJumps,
-  SIZE,
-  stepTargets,
-} from '~/games/halma/logic'
+import type { Stone } from '~/games/tictactoe/logic'
+import { aiMove, checkWin, createBoard, isFull, SIZE } from '~/games/tictactoe/logic'
 
 type GameMode = 'pvp-local' | 'pve' | 'online'
-type Status = 'playing' | 'win'
-
-interface Piece {
-  id: number
-  stone: Stone
-  r: number
-  c: number
-  hopping: boolean
-}
+type GameStatus = 'playing' | 'win' | 'draw'
 
 const mode = ref<GameMode>('pvp-local')
 const board = ref(createBoard())
-const pieces = ref<Piece[]>([])
-const current = ref<Stone>(1)
-const status = ref<Status>('playing')
-const winner = ref<Stone>(0)
+const current = ref<Stone>(1) // 1=X 先手 2=O
+const status = ref<GameStatus>('playing')
+const winLine = ref<Array<[number, number]>>([])
+const lastMove = ref<[number, number] | null>(null)
 
-const selected = ref<Pos | null>(null)
-const animating = ref(false)
-
-const aiSelf = ref<Stone>(2) // AI 默认执蓝
+const aiSelf = ref<Stone>(2) // AI 默认执 O 后手
 const aiThinking = ref(false)
 
 const rtc = useWebRTC()
@@ -41,7 +21,7 @@ const onlineCanMove = computed(() => rtc.status.value === 'connected' && current
 
 const joinRoomInput = ref('')
 
-const stats = reactive({ red: 0, blue: 0 })
+const stats = reactive({ x: 0, o: 0, draw: 0 })
 
 const modeOptions: Array<{ value: GameMode, label: string }> = [
   { value: 'pvp-local', label: '本地双人' },
@@ -49,175 +29,86 @@ const modeOptions: Array<{ value: GameMode, label: string }> = [
   { value: 'online', label: '联机对战' },
 ]
 
-function initPieces() {
-  let id = 0
-  const list: Piece[] = []
-  for (const [r, c] of PLAYER1_HOME)
-    list.push({ id: id++, stone: 1, r, c, hopping: false })
-  for (const [r, c] of PLAYER2_HOME)
-    list.push({ id: id++, stone: 2, r, c, hopping: false })
-  pieces.value = list
+function stoneLabel(s: Stone) {
+  return s === 1 ? 'X' : s === 2 ? 'O' : ''
 }
 
-const stepSet = computed<Set<string>>(() => {
-  if (!selected.value)
-    return new Set()
-  const [r, c] = selected.value
-  return new Set(stepTargets(board.value, r, c).map(([sr, sc]) => `${sr},${sc}`))
+const turnLabel = computed(() => {
+  if (status.value === 'win')
+    return `${stoneLabel(current.value)} 方胜出 🎉`
+  if (status.value === 'draw')
+    return '平局'
+  return `${stoneLabel(current.value)} 方落子`
 })
 
-const jumpMap = computed<Map<string, Pos[]>>(() => {
-  if (!selected.value)
-    return new Map()
-  const [r, c] = selected.value
-  return reachableJumps(board.value, r, c)
-})
-
-function isStepTarget(r: number, c: number) {
-  return stepSet.value.has(`${r},${c}`)
-}
-function isJumpTarget(r: number, c: number) {
-  return jumpMap.value.has(`${r},${c}`)
+function newGame() {
+  board.value = createBoard()
+  current.value = 1
+  status.value = 'playing'
+  winLine.value = []
+  lastMove.value = null
+  aiThinking.value = false
 }
 
-function isHome(stone: Stone, r: number, c: number) {
-  const home = stone === 1 ? PLAYER1_HOME : PLAYER2_HOME
-  return home.some(([hr, hc]) => hr === r && hc === c)
-}
-
-function isSelected(r: number, c: number) {
-  return !!selected.value && selected.value[0] === r && selected.value[1] === c
-}
-
-function findPiece(r: number, c: number) {
-  return pieces.value.find(p => p.r === r && p.c === c)
-}
-
-function commitMove(fr: number, fc: number, tr: number, tc: number) {
+function applyMove(r: number, c: number, stone: Stone): boolean {
+  if (status.value !== 'playing')
+    return false
+  if (board.value[r][c] !== 0)
+    return false
   const next = board.value.map(row => row.slice()) as typeof board.value
-  next[tr][tc] = next[fr][fc]
-  next[fr][fc] = 0
+  next[r][c] = stone
   board.value = next
-}
+  lastMove.value = [r, c]
 
-function endTurn() {
-  selected.value = null
-  const w = checkWin(board.value)
-  if (w) {
+  const win = checkWin(board.value)
+  if (win) {
     status.value = 'win'
-    winner.value = w
-    if (w === 1)
-      stats.red++
+    winLine.value = win.line
+    if (win.stone === 1)
+      stats.x++
     else
-      stats.blue++
-    const winnerName = w === 1 ? '红方' : '蓝方'
+      stats.o++
     let extra = ''
     if (mode.value === 'pve')
-      extra = w === aiSelf.value ? '（AI 获胜）' : '（你赢了）'
+      extra = win.stone === aiSelf.value ? '（AI 获胜）' : '（你赢了）'
     else if (mode.value === 'online' && rtc.status.value === 'connected')
-      extra = w === onlineMyStone.value ? '（你赢了）' : '（对手获胜）'
-    ElMessage.success(`${winnerName}胜出 🎉${extra}`)
-    return
+      extra = win.stone === onlineMyStone.value ? '（你赢了）' : '（对手获胜）'
+    ElMessage.success(`${stoneLabel(win.stone)} 胜出 🎉${extra}`)
+    return true
   }
-  current.value = current.value === 1 ? 2 : 1
-  if (mode.value === 'pve')
+  if (isFull(board.value)) {
+    status.value = 'draw'
+    stats.draw++
+    ElMessage.info('平局')
+    return true
+  }
+  current.value = stone === 1 ? 2 : 1
+  return true
+}
+
+function handleCellClick(r: number, c: number) {
+  if (status.value !== 'playing')
+    return
+
+  if (mode.value === 'pve') {
+    if (current.value === aiSelf.value || aiThinking.value)
+      return
+    applyMove(r, c, current.value)
     triggerAIIfNeeded()
-}
-
-function wait(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-async function playStep(piece: Piece, tr: number, tc: number) {
-  animating.value = true
-  const fr = piece.r
-  const fc = piece.c
-  piece.r = tr
-  piece.c = tc
-  await wait(260)
-  commitMove(fr, fc, tr, tc)
-  animating.value = false
-  endTurn()
-}
-
-async function playJump(piece: Piece, path: Pos[]) {
-  animating.value = true
-  let fr = piece.r
-  let fc = piece.c
-  for (const [tr, tc] of path) {
-    piece.hopping = false
-    await nextTick()
-    piece.r = tr
-    piece.c = tc
-    piece.hopping = true
-    await wait(360)
-    commitMove(fr, fc, tr, tc)
-    fr = tr
-    fc = tc
-  }
-  piece.hopping = false
-  animating.value = false
-  endTurn()
-}
-
-/** 局部执行一段动作（不广播） */
-async function performMove(from: Pos, path: Pos[], kind: 'step' | 'jump') {
-  const piece = findPiece(from[0], from[1])
-  if (!piece)
-    return
-  if (kind === 'step') {
-    const [tr, tc] = path[0]
-    await playStep(piece, tr, tc)
-  }
-  else {
-    await playJump(piece, path)
-  }
-}
-
-function handleClick(r: number, c: number) {
-  if (status.value !== 'playing' || animating.value)
-    return
-  if (mode.value === 'pve' && (current.value === aiSelf.value || aiThinking.value))
-    return
-  if (mode.value === 'online' && !onlineCanMove.value) {
-    if (rtc.status.value === 'connected')
-      ElMessage.warning('还未轮到你')
     return
   }
 
-  const cell = board.value[r][c]
-  const myStone
-    = mode.value === 'online' ? onlineMyStone.value : current.value
-
-  // 选自己的棋子；若再次点击已选中的棋子则取消
-  if (cell === myStone) {
-    if (mode.value === 'online' && current.value !== myStone)
-      return
-    if (isSelected(r, c)) {
-      selected.value = null
-      return
-    }
-    selected.value = [r, c]
+  if (mode.value === 'online') {
+    if (!onlineCanMove.value)
+      return ElMessage.warning('还未轮到你或连接未就绪')
+    const stone = onlineMyStone.value
+    if (applyMove(r, c, stone))
+      rtc.send({ type: 'move', payload: { r, c, stone } })
     return
   }
 
-  if (!selected.value || cell !== 0)
-    return
-  const [sr, sc] = selected.value
-
-  if (isStepTarget(r, c)) {
-    const path: Pos[] = [[r, c]]
-    if (mode.value === 'online')
-      rtc.send({ type: 'move', payload: { from: [sr, sc], path, kind: 'step' } })
-    performMove([sr, sc], path, 'step')
-    return
-  }
-  const path = jumpMap.value.get(`${r},${c}`)
-  if (path && path.length) {
-    if (mode.value === 'online')
-      rtc.send({ type: 'move', payload: { from: [sr, sc], path, kind: 'jump' } })
-    performMove([sr, sc], path, 'jump')
-  }
+  // 本地双人
+  applyMove(r, c, current.value)
 }
 
 function triggerAIIfNeeded() {
@@ -226,46 +117,26 @@ function triggerAIIfNeeded() {
   if (current.value !== aiSelf.value)
     return
   aiThinking.value = true
-  setTimeout(async () => {
-    const move: AIMove | null = aiMove(board.value, aiSelf.value)
+  setTimeout(() => {
+    const move = aiMove(board.value.map(r => r.slice()) as typeof board.value, aiSelf.value)
+    if (move)
+      applyMove(move[0], move[1], aiSelf.value)
     aiThinking.value = false
-    if (!move)
-      return endTurn()
-    await performMove(move.from, move.path, move.kind)
-  }, 260)
-}
-
-function newGame() {
-  board.value = createBoard()
-  initPieces()
-  current.value = 1
-  status.value = 'playing'
-  winner.value = 0
-  selected.value = null
-  animating.value = false
-  aiThinking.value = false
-  if (mode.value === 'pve')
-    triggerAIIfNeeded()
-}
-
-function requestReset() {
-  if (mode.value === 'online') {
-    if (rtc.status.value !== 'connected')
-      return ElMessage.warning('未连接，无法同步重开')
-    rtc.send({ type: 'reset' })
-  }
-  newGame()
+  }, 220)
 }
 
 watch(mode, () => {
   newGame()
   if (mode.value !== 'online')
     rtc.reset()
+  if (mode.value === 'pve')
+    triggerAIIfNeeded()
 })
 
 watch(aiSelf, () => {
   if (mode.value === 'pve') {
     newGame()
+    triggerAIIfNeeded()
   }
 })
 
@@ -279,13 +150,22 @@ watch(
 
 rtc.onMessage((msg) => {
   if (msg.type === 'move') {
-    const p = msg.payload as { from: Pos, path: Pos[], kind: 'step' | 'jump' }
-    performMove(p.from, p.path, p.kind)
+    const p = msg.payload as { r: number, c: number, stone: Stone }
+    applyMove(p.r, p.c, p.stone)
   }
   else if (msg.type === 'reset') {
     newGame()
   }
 })
+
+function requestReset() {
+  if (mode.value === 'online') {
+    if (rtc.status.value !== 'connected')
+      return ElMessage.warning('未连接，无法同步重开')
+    rtc.send({ type: 'reset' })
+  }
+  newGame()
+}
 
 async function copyText(text: string) {
   try {
@@ -297,11 +177,9 @@ async function copyText(text: string) {
   }
 }
 
-const turnLabel = computed(() => {
-  if (status.value === 'win')
-    return `${winner.value === 1 ? '红' : '蓝'}方胜出 🎉`
-  return `${current.value === 1 ? '红' : '蓝'}方行动`
-})
+function isWinCell(r: number, c: number) {
+  return winLine.value.some(p => p[0] === r && p[1] === c)
+}
 
 onMounted(newGame)
 </script>
@@ -311,10 +189,10 @@ onMounted(newGame)
     <header class="mb-5 flex items-center justify-between gap-3">
       <div>
         <p class="m-0 text-xs text-[color:var(--app-text-muted)] font-bold tracking-[0.18em] uppercase">
-          Halma · 跳棋
+          Tic Tac Toe · 井字棋
         </p>
         <h1 class="m-0 text-2xl text-[color:var(--app-text)] sm:text-3xl">
-          9×9 · 占领对方大本营
+          3×3 · 三连即胜
         </h1>
       </div>
       <el-button text @click="$router.push('/')">
@@ -329,38 +207,26 @@ onMounted(newGame)
       <section class="board-wrap">
         <div class="board" :style="{ '--size': SIZE }">
           <template v-for="(row, r) in board" :key="r">
-            <div
-              v-for="(_cell, c) in row"
+            <button
+              v-for="(cell, c) in row"
               :key="`${r}-${c}`"
               class="cell"
               :class="{
-                'home-red': isHome(1, r, c),
-                'home-blue': isHome(2, r, c),
-                'is-target-step': isStepTarget(r, c),
-                'is-target-jump': isJumpTarget(r, c),
-                'is-selected': isSelected(r, c),
+                'cell-last': lastMove && lastMove[0] === r && lastMove[1] === c,
+                'cell-win': isWinCell(r, c),
               }"
-              @click="handleClick(r, c)"
-            />
-          </template>
-          <div class="pieces-layer">
-            <span
-              v-for="p in pieces"
-              :key="p.id"
-              class="piece"
-              :style="{
-                transform: `translate(calc((var(--cell) + var(--gap)) * ${p.c} + var(--cell) * 0.11), calc((var(--cell) + var(--gap)) * ${p.r} + var(--cell) * 0.11))`,
-              }"
+              :disabled="status !== 'playing' || cell !== 0"
+              @click="handleCellClick(r, c)"
             >
               <span
-                class="piece-inner"
-                :class="[
-                  p.stone === 1 ? 'piece-red' : 'piece-blue',
-                  { 'is-hopping': p.hopping },
-                ]"
-              />
-            </span>
-          </div>
+                v-if="cell"
+                class="mark"
+                :class="cell === 1 ? 'mark-x' : 'mark-o'"
+              >
+                {{ stoneLabel(cell) }}
+              </span>
+            </button>
+          </template>
         </div>
       </section>
 
@@ -375,7 +241,7 @@ onMounted(newGame)
                 </el-tag>
               </div>
               <el-tag
-                :type="status === 'win' ? 'success' : 'warning'"
+                :type="status === 'win' ? 'success' : status === 'draw' ? 'info' : 'warning'"
                 effect="light"
                 round
               >
@@ -383,26 +249,32 @@ onMounted(newGame)
               </el-tag>
             </div>
           </template>
-
-          <div class="grid grid-cols-2 gap-3 text-center">
+          <div class="grid grid-cols-3 gap-3 text-center">
             <div class="rounded-xl bg-[color:var(--app-surface-soft)] p-3">
               <div class="text-xs text-[color:var(--app-text-muted)]">
-                红胜
+                X 胜
               </div>
               <div class="mt-1 text-xl font-semibold">
-                {{ stats.red }}
+                {{ stats.x }}
               </div>
             </div>
             <div class="rounded-xl bg-[color:var(--app-surface-soft)] p-3">
               <div class="text-xs text-[color:var(--app-text-muted)]">
-                蓝胜
+                O 胜
               </div>
               <div class="mt-1 text-xl font-semibold">
-                {{ stats.blue }}
+                {{ stats.o }}
+              </div>
+            </div>
+            <div class="rounded-xl bg-[color:var(--app-surface-soft)] p-3">
+              <div class="text-xs text-[color:var(--app-text-muted)]">
+                平局
+              </div>
+              <div class="mt-1 text-xl font-semibold">
+                {{ stats.draw }}
               </div>
             </div>
           </div>
-
           <div class="mt-4 flex flex-wrap gap-2">
             <el-button type="primary" w-full @click="requestReset">
               <template #icon>
@@ -431,10 +303,10 @@ onMounted(newGame)
           <div v-if="mode === 'pve'" class="mt-4 fc">
             <el-radio-group v-model="aiSelf">
               <el-radio-button :value="2">
-                AI 执蓝（你先手）
+                AI 执 O（你先手）
               </el-radio-button>
               <el-radio-button :value="1">
-                AI 执红（你后手）
+                AI 执 X（你后手）
               </el-radio-button>
             </el-radio-group>
           </div>
@@ -475,7 +347,7 @@ onMounted(newGame)
           />
 
           <p class="m-0 text-xs text-[color:var(--app-text-muted)] leading-[1.7]">
-            通过 WebRTC 端到端直连，使用公共信令服务器交换房号。主机执红先手。
+            通过 WebRTC 端到端直连，使用公共信令服务器交换房号。主机执 X 先手。
           </p>
 
           <div v-if="!rtc.role.value" class="mt-3 flex flex-wrap gap-2">
@@ -545,7 +417,7 @@ onMounted(newGame)
                 :closable="false"
                 show-icon
                 :title="`已加入房间 ${rtc.roomId.value}`"
-                description="你当前执蓝后手，可以开始对局。"
+                description="你当前执 O 后手，可以开始对局。"
               />
             </div>
           </template>
@@ -570,96 +442,71 @@ onMounted(newGame)
   box-shadow: 0 24px 40px rgba(40, 23, 8, 0.18);
 }
 .board {
-  --cell: clamp(28px, 5vw, 48px);
-  --gap: 4px;
-  position: relative;
+  --cell: clamp(80px, 14vw, 120px);
+  --gap: 8px;
   display: grid;
   grid-template-columns: repeat(var(--size), var(--cell));
   grid-template-rows: repeat(var(--size), var(--cell));
   gap: var(--gap);
-  padding: 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(46, 24, 8, 0.18);
+}
+html.dark .board {
+  background: rgba(20, 22, 36, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 170, 0.18);
 }
 .cell {
   width: var(--cell);
   height: var(--cell);
-  border-radius: 9999px;
-  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: var(--app-surface);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--cell) * 0.55);
+  font-weight: 700;
+  color: var(--app-text);
   transition:
+    background 0.15s ease,
     transform 0.15s ease,
-    background 0.2s ease,
-    outline-color 0.2s ease;
-  outline: 2px solid transparent;
+    box-shadow 0.2s ease;
 }
-.cell.home-red {
-  background: rgba(232, 84, 84, 0.18);
+.cell:disabled {
+  cursor: default;
 }
-.cell.home-blue {
-  background: rgba(70, 132, 240, 0.18);
+.cell:hover:not(:disabled) {
+  background: var(--app-accent-soft);
+  transform: translateY(-2px);
 }
-.cell.is-target-step {
-  background: rgba(120, 200, 130, 0.5);
-  outline: 2px dashed rgba(80, 160, 90, 0.8);
+.cell-last {
+  outline: 2px solid var(--app-accent);
+  outline-offset: -2px;
 }
-.cell.is-target-jump {
-  background: rgba(255, 196, 0, 0.5);
-  outline: 2px dashed rgba(255, 160, 0, 0.85);
+.cell-win {
+  background: rgba(255, 196, 0, 0.18);
+  box-shadow:
+    0 0 0 2px rgba(255, 196, 0, 0.7),
+    0 0 24px rgba(255, 196, 0, 0.35);
 }
-.cell.is-selected {
-  transform: scale(1.05);
-  outline: 3px solid var(--app-accent);
+.mark {
+  display: inline-block;
+  line-height: 1;
 }
-.pieces-layer {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: calc(var(--cell) * var(--size) + var(--gap) * (var(--size) - 1));
-  height: calc(var(--cell) * var(--size) + var(--gap) * (var(--size) - 1));
-  pointer-events: none;
+.mark-x {
+  color: #d9352e;
 }
-.piece {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: calc(var(--cell) * 0.78);
-  height: calc(var(--cell) * 0.78);
-  display: block;
-  transform: translate(0, 0);
-  transition: transform 0.32s cubic-bezier(0.34, 1.2, 0.5, 1);
-  will-change: transform;
+.mark-o {
+  color: #1c4cba;
 }
-.piece-inner {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 9999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  transform-origin: 50% 80%;
+html.dark .mark-x {
+  color: #ff8b8b;
 }
-.piece-inner.is-hopping {
-  animation: halma-hop 0.36s ease-in-out;
-}
-@keyframes halma-hop {
-  0% {
-    transform: translateY(0) scale(1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  }
-  45% {
-    transform: translateY(-65%) scale(1.08);
-    box-shadow: 0 14px 14px rgba(0, 0, 0, 0.18);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  }
-}
-.piece-red {
-  background: radial-gradient(circle at 35% 30%, #ff8b8b, #c11919 70%);
-}
-.piece-blue {
-  background: radial-gradient(circle at 35% 30%, #88b6ff, #1c4cba 70%);
+html.dark .mark-o {
+  color: #88b6ff;
 }
 .room-id-pill {
   display: inline-flex;
