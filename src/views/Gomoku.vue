@@ -137,6 +137,14 @@ watch(aiSelf, () => {
   }
 })
 
+watch(
+  [() => rtc.status.value, () => rtc.role.value],
+  ([nextStatus, nextRole], [prevStatus]) => {
+    if (nextRole === 'guest' && nextStatus === 'connected' && prevStatus !== 'connected')
+      ElMessage.success(`已成功加入房间 ${rtc.roomId.value}`)
+  },
+)
+
 // 联机消息处理
 rtc.onMessage((msg) => {
   if (msg.type === 'move') {
@@ -354,11 +362,14 @@ onMounted(() => {
           <template v-if="rtc.role.value === 'host'">
             <div class="mt-4">
               <div class="room-id-pill">
-                <span v-if="rtc.roomId.value" class="select-none font-mono">房号: {{ rtc.roomId.value }}</span>
+                <template v-if="rtc.roomId.value">
+                  <span class="select-none font-mono">房号: {{ rtc.roomId.value }}</span>
+                  <i ml-2 cursor-pointer text-base class="i-carbon-copy" @click="copyText(rtc.roomId.value)" />
+                </template>
+
                 <el-icon v-else class="is-loading">
                   <i class="i-carbon-circle-dash" />
                 </el-icon>
-                <i ml-2 cursor-pointer text-base class="i-carbon-copy" @click="copyText(rtc.roomId.value)" />
               </div>
               <div mt-4>
                 <el-alert v-if="rtc.status.value === 'awaiting-peer'" :closable="false">
@@ -385,6 +396,25 @@ onMounted(() => {
               >
                 加入房间
               </el-button>
+            </div>
+
+            <div v-if="rtc.status.value === 'connecting'" class="mt-4">
+              <el-alert
+                type="info"
+                :closable="false"
+                show-icon
+                title="正在加入房间，请稍候…"
+              />
+            </div>
+
+            <div v-else-if="rtc.status.value === 'connected'" class="mt-4">
+              <el-alert
+                type="success"
+                :closable="false"
+                show-icon
+                :title="`已加入房间 ${rtc.roomId.value}`"
+                description="你当前执白后手，可以开始对局。"
+              />
             </div>
           </template>
         </el-card>
