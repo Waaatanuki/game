@@ -2,7 +2,7 @@
   "name": "game",
   "type": "module",
   "version": "0.0.0",
-  "private": true,
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

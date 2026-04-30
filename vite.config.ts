@@ -8,6 +8,8 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // 部署到 https://<user>.github.io/game/，所以以仓库名作为 base
+  base: process.env.GITHUB_PAGES === 'true' ? '/game/' : '/',
   plugins: [
     vue(),
     AutoImport({
