@@ -2,7 +2,7 @@ import { defineConfig, presetAttributify, presetIcons, presetWind3, transformerD
 
 export default defineConfig({
   // 动态绑定的图标类名（registry.ts 中按字段提供）需要加入 safelist，否则 UnoCSS 扫描不到
-  safelist: ['i-carbon-circle-dash', 'i-carbon-progress-bar', 'i-carbon-checkbox', 'i-carbon-jump-link'],
+  safelist: ['i-carbon-circle-dash', 'i-carbon-progress-bar', 'i-carbon-checkbox', 'i-carbon-jump-link', 'i-carbon-table-split'],
   shortcuts: {
     'fc': 'flex justify-center items-center',
     'page-wrap': 'mx-auto max-w-[1120px] px-3 py-7 md:px-4 md:py-12 lg:py-16',

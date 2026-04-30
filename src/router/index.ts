@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '跳棋' },
   },
   {
+    path: '/sudoku',
+    name: 'sudoku',
+    component: () => import('~/views/Sudoku.vue'),
+    meta: { title: '数独' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
