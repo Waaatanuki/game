@@ -300,7 +300,18 @@ onMounted(() => {
         <el-card v-if="mode === 'online'" shadow="never" class="panel-card">
           <template #header>
             <div class="flex items-center justify-between">
-              <span class="font-semibold">联机对战</span>
+              <div fc gap-2>
+                <span class="font-semibold">联机对战</span>
+                <el-button
+                  v-if="rtc.role.value"
+                  size="small"
+                  plain
+                  type="danger"
+                  @click="rtc.reset()"
+                >
+                  断开并重置
+                </el-button>
+              </div>
               <el-tag
                 size="small"
                 :type="rtc.status.value === 'connected' ? 'success' : rtc.status.value === 'error' ? 'danger' : 'info'"
@@ -342,52 +353,32 @@ onMounted(() => {
           <!-- 主机视角：展示房号 -->
           <template v-if="rtc.role.value === 'host'">
             <div class="mt-4">
-              <div class="mb-2 text-xs text-[color:var(--app-text-muted)]">
-                把下面的房号告诉对方
-              </div>
               <div class="room-id-pill">
-                <span v-if="rtc.roomId.value" class="font-mono">{{ rtc.roomId.value }}</span>
+                <span v-if="rtc.roomId.value" class="select-none font-mono">房号: {{ rtc.roomId.value }}</span>
                 <el-icon v-else class="is-loading">
                   <i class="i-carbon-circle-dash" />
                 </el-icon>
+                <i ml-2 cursor-pointer text-base class="i-carbon-copy" @click="copyText(rtc.roomId.value)" />
               </div>
-              <el-button
-                size="small"
-                class="mt-3"
-                :disabled="!rtc.roomId.value"
-                @click="copyText(rtc.roomId.value)"
-              >
-                <template #icon>
-                  <i class="i-carbon-copy" />
-                </template>
-                复制房号
-              </el-button>
-              <p
-                v-if="rtc.status.value === 'awaiting-peer'"
-                class="mt-3 text-xs text-[color:var(--app-text-muted)]"
-              >
-                正在等待对方加入…
-              </p>
+              <div mt-4>
+                <el-alert v-if="rtc.status.value === 'awaiting-peer'" :closable="false">
+                  正在等待对方加入…
+                </el-alert>
+              </div>
             </div>
           </template>
 
           <!-- 客机视角：输入房号 -->
           <template v-if="rtc.role.value === 'guest'">
-            <div class="mt-4">
-              <div class="mb-2 text-xs text-[color:var(--app-text-muted)]">
-                输入主机分享的 6 位房号
-              </div>
+            <div class="mt-2 fc gap-10">
               <el-input
                 v-model="joinRoomInput"
-                placeholder="如 A3K9PQ"
+                placeholder=" 输入主机分享的 6 位房号"
                 maxlength="8"
-                class="font-mono"
                 @keyup.enter="rtc.joinRoom(joinRoomInput)"
               />
               <el-button
-                size="small"
                 type="primary"
-                class="mt-3"
                 :disabled="!joinRoomInput || rtc.status.value === 'connecting'"
                 :loading="rtc.status.value === 'connecting'"
                 @click="rtc.joinRoom(joinRoomInput)"
@@ -396,16 +387,6 @@ onMounted(() => {
               </el-button>
             </div>
           </template>
-
-          <el-button
-            v-if="rtc.role.value"
-            class="mt-4"
-            text
-            type="danger"
-            @click="rtc.reset()"
-          >
-            断开并重置
-          </el-button>
         </el-card>
       </aside>
     </div>
@@ -415,8 +396,11 @@ onMounted(() => {
 <style scoped>
 .board-wrap {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  align-self: start;
+  justify-self: start;
+  width: max-content;
   padding: 18px;
   border-radius: 22px;
   background: var(--gomoku-board-bg);
