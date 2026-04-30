@@ -64,7 +64,14 @@ export function useWebRTC() {
   async function ensurePeer(id: string): Promise<PeerType> {
     const { Peer } = await import('peerjs')
     return new Promise((resolve, reject) => {
-      const p = new Peer(id, { debug: 1 })
+      const p = new Peer(id, {
+        debug: 1,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.voip.blackberry.com:3478' },
+          ],
+        },
+      })
       p.on('open', () => resolve(p))
       p.on('error', err => reject(err))
     })
