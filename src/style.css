@@ -1,5 +1,5 @@
 :root {
-  color: #24170f;
+  color-scheme: light;
   font-family: 'Avenir Next', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -7,14 +7,80 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  --app-bg:
+    radial-gradient(circle at top, rgba(255, 215, 170, 0.45), transparent 32%),
+    linear-gradient(180deg, #fffaf3 0%, #f4ede3 100%);
+  --app-text: #24170f;
+  --app-text-muted: rgba(36, 23, 15, 0.6);
+  --app-surface: rgba(255, 252, 247, 0.92);
+  --app-surface-soft: rgba(250, 241, 230, 0.7);
+  --app-border: rgba(102, 73, 50, 0.18);
+  --app-accent: #c97a1a;
+  --app-accent-soft: rgba(201, 122, 26, 0.12);
+  --app-header-bg: rgba(255, 250, 243, 0.78);
+
+  --gomoku-board: #e7c08b;
+  --gomoku-board-bg: linear-gradient(135deg, #f4d3a0, #d8a667);
+  --gomoku-line: rgba(46, 24, 8, 0.55);
+}
+
+html.dark {
+  color-scheme: dark;
+
+  --app-bg:
+    radial-gradient(circle at top, rgba(120, 130, 220, 0.18), transparent 36%),
+    linear-gradient(180deg, #0d0f1a 0%, #161826 100%);
+  --app-text: #f0eef9;
+  --app-text-muted: rgba(240, 238, 249, 0.62);
+  --app-surface: rgba(28, 30, 46, 0.88);
+  --app-surface-soft: rgba(36, 38, 58, 0.65);
+  --app-border: rgba(255, 255, 255, 0.08);
+  --app-accent: #ffb454;
+  --app-accent-soft: rgba(255, 180, 84, 0.16);
+  --app-header-bg: rgba(15, 17, 28, 0.75);
+
+  --gomoku-board: #4a3622;
+  --gomoku-board-bg: linear-gradient(135deg, #5a3f24, #2f2113);
+  --gomoku-line: rgba(255, 220, 170, 0.38);
 }
 
 body {
-  background:
-    radial-gradient(circle at top, rgba(255, 215, 170, 0.3), transparent 28%),
-    linear-gradient(180deg, #fffaf3 0%, #f4ede3 100%);
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
 }
 
-#app {
-  min-height: 100vh;
+#app { min-height: 100vh; }
+
+.page-wrap {
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 28px 16px;
+}
+@media (min-width: 768px) {
+  .page-wrap { padding: 48px 24px; }
+}
+
+.hero-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  padding: 32px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
+}
+@media (min-width: 768px) { .hero-shell { padding: 44px; } }
+
+.panel-card {
+  border-radius: 22px !important;
+  border: 1px solid var(--app-border) !important;
+  background: var(--app-surface) !important;
+  backdrop-filter: blur(14px);
+  box-shadow: none !important;
+  color: var(--app-text);
+}
+.panel-card .el-card__header {
+  border-bottom: 1px solid var(--app-border);
 }

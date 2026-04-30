@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "element-plus": "^2.13.7",
-    "vue": "^3.5.32"
+    "peerjs": "^1.5.5",
+    "vue": "^3.5.32",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^8.2.0",
+    "@iconify-json/carbon": "^1.2.20",
     "@types/node": "^22",
     "@unocss/eslint-plugin": "^66.6.8",
     "@unocss/reset": "^66.6.8",

@@ -1,0 +1,26 @@
+import type { RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
+
+const routes: RouteRecordRaw[] = [
+  {
+    path: '/',
+    name: 'home',
+    component: () => import('~/views/Home.vue'),
+    meta: { title: '游戏大厅' },
+  },
+  {
+    path: '/gomoku',
+    name: 'gomoku',
+    component: () => import('~/views/Gomoku.vue'),
+    meta: { title: '五子棋' },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/',
+  },
+]
+
+export const router = createRouter({
+  history: createWebHashHistory(),
+  routes,
+})

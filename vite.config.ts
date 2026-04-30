@@ -11,7 +11,8 @@ export default defineConfig({
   plugins: [
     vue(),
     AutoImport({
-      imports: ['vue'],
+      imports: ['vue', 'vue-router'],
+      dirs: ['src/composables'],
       dts: 'types/auto-imports.d.ts',
       vueTemplate: true,
       resolvers: [ElementPlusResolver()],
@@ -26,5 +27,8 @@ export default defineConfig({
     alias: {
       '~': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  server: {
+    host: true, // 监听 0.0.0.0，允许局域网访问
   },
 })
