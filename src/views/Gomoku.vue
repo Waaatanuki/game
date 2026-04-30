@@ -30,10 +30,10 @@ const stats = reactive({
 
 const turnLabel = computed(() => {
   if (status.value === 'win')
-    return `${current.value === 1 ? '白' : '黑'} 方胜出 🎉`
+    return `${current.value === 1 ? '白' : '黑'}方胜出 🎉`
   if (status.value === 'draw')
     return '和棋'
-  return `${current.value === 1 ? '黑' : '白'} 方落子`
+  return `${current.value === 1 ? '黑' : '白'}方落子`
 })
 
 const modeOptions: Array<{ value: GameMode, label: string, hint: string }> = [
@@ -216,7 +216,12 @@ onMounted(() => {
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="flex items-center justify-between">
-              <span class="font-semibold">对局状态</span>
+              <div fc gap-2>
+                <span class="font-semibold">对局状态</span>
+                <el-tag v-if="aiThinking" type="warning" effect="light">
+                  AI 思考中…
+                </el-tag>
+              </div>
               <el-tag
                 :type="status === 'win' ? 'success' : status === 'draw' ? 'info' : 'warning'"
                 effect="light"
@@ -253,15 +258,12 @@ onMounted(() => {
             </div>
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
-            <el-button type="primary" @click="requestReset">
+            <el-button type="primary" w-full @click="requestReset">
               <template #icon>
                 <i class="i-carbon-restart" />
               </template>
               重新开始
             </el-button>
-            <el-tag v-if="aiThinking" type="warning" effect="light">
-              AI 思考中…
-            </el-tag>
           </div>
         </el-card>
 
@@ -269,17 +271,14 @@ onMounted(() => {
           <template #header>
             <span class="font-semibold">游戏模式</span>
           </template>
-          <el-radio-group v-model="mode" class="!flex !flex-col !gap-2">
+          <el-radio-group v-model="mode" w-full flex items-center justify-evenly gap-6>
             <el-radio
               v-for="opt in modeOptions"
               :key="opt.value"
               :value="opt.value"
               class="items-start !m-0 !h-auto"
             >
-              <div class="flex flex-col">
-                <span class="font-medium">{{ opt.label }}</span>
-                <span class="text-xs text-[color:var(--app-text-muted)]">{{ opt.hint }}</span>
-              </div>
+              <span class="font-medium">{{ opt.label }}</span>
             </el-radio>
           </el-radio-group>
 
@@ -426,22 +425,25 @@ onMounted(() => {
 }
 .board {
   --cell: clamp(20px, 4.2vw, 36px);
+  --line: var(--gomoku-line);
   display: grid;
   grid-template-columns: repeat(var(--size), var(--cell));
   grid-template-rows: repeat(var(--size), var(--cell));
   position: relative;
-  background:
-    linear-gradient(to right, var(--gomoku-line) 1px, transparent 1px) 0 0 / var(--cell) var(--cell),
-    linear-gradient(to bottom, var(--gomoku-line) 1px, transparent 1px) 0 0 / var(--cell) var(--cell);
   background-color: var(--gomoku-board);
+  /* 网格线偏移到每个 cell 的中心，从而与按钮中心对齐 */
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: var(--cell) var(--cell);
+  background-position: calc(var(--cell) / 2) calc(var(--cell) / 2);
+  background-repeat: repeat;
   border-radius: 8px;
-  padding: calc(var(--cell) / 2);
   box-sizing: content-box;
 }
 .cell {
   width: var(--cell);
   height: var(--cell);
-  margin: calc(var(--cell) / -2) 0 0 calc(var(--cell) / -2);
   background: transparent;
   border: 0;
   padding: 0;
