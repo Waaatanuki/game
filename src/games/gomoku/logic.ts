@@ -108,19 +108,27 @@ function scoreLine(board: Board, r: number, c: number, dr: number, dc: number, s
   let i = 1
   while (true) {
     const v = board[r + dr * i]?.[c + dc * i]
-    if (v === stone) { count++; i++ }
+    if (v === stone) {
+      count++
+      i++
+    }
     else {
       if (v === undefined || v !== 0)
-        blockTail = true; break
+        blockTail = true
+      break
     }
   }
   i = 1
   while (true) {
     const v = board[r - dr * i]?.[c - dc * i]
-    if (v === stone) { count++; i++ }
+    if (v === stone) {
+      count++
+      i++
+    }
     else {
       if (v === undefined || v !== 0)
-        blockHead = true; break
+        blockHead = true
+      break
     }
   }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Stone } from '~/games/gomoku/logic'
+import { Button as IslandButton, Radio as IslandRadio, Tag as IslandTag, Title as IslandTitle, Notification } from 'animal-island-vue'
 import { aiMove, BOARD_SIZE, checkWin, createBoard, isFull } from '~/games/gomoku/logic'
 
 type GameMode = 'pvp-local' | 'pve' | 'online'
@@ -19,8 +20,6 @@ const aiThinking = ref(false)
 const rtc = useWebRTC()
 const onlineMyStone = computed<Stone>(() => rtc.role.value === 'host' ? 1 : 2)
 const onlineCanMove = computed(() => rtc.status.value === 'connected' && current.value === onlineMyStone.value)
-
-const joinRoomInput = ref('')
 
 const stats = reactive({
   black: 0,
@@ -78,13 +77,13 @@ function applyMove(r: number, c: number, stone: Stone): boolean {
       extra = stone === aiSelf.value ? '（AI 获胜）' : '（你赢了）'
     else if (mode.value === 'online' && rtc.status.value === 'connected')
       extra = stone === onlineMyStone.value ? '（你赢了）' : '（对手获胜）'
-    ElMessage.success(`${winnerName}胜出 🎉${extra}`)
+    Notification.success(`${winnerName}胜出 🎉${extra}`)
     return true
   }
   if (isFull(board.value)) {
     status.value = 'draw'
     stats.draw++
-    ElMessage.info('和棋')
+    Notification.info('和棋')
     return true
   }
   current.value = stone === 1 ? 2 : 1
@@ -105,7 +104,7 @@ function handleCellClick(r: number, c: number) {
 
   if (mode.value === 'online') {
     if (!onlineCanMove.value)
-      return ElMessage.warning('还未轮到你或连接未就绪')
+      return Notification.warning('还未轮到你或连接未就绪')
     const stone = onlineMyStone.value
     if (applyMove(r, c, stone))
       rtc.send({ type: 'move', payload: { r, c, stone } })
@@ -149,7 +148,7 @@ watch(
   [() => rtc.status.value, () => rtc.role.value],
   ([nextStatus, nextRole], [prevStatus]) => {
     if (nextRole === 'guest' && nextStatus === 'connected' && prevStatus !== 'connected')
-      ElMessage.success(`已成功加入房间 ${rtc.roomId.value}`)
+      Notification.success(`已成功加入房间 ${rtc.roomId.value}`)
   },
 )
 
@@ -167,20 +166,10 @@ rtc.onMessage((msg) => {
 function requestReset() {
   if (mode.value === 'online') {
     if (rtc.status.value !== 'connected')
-      return ElMessage.warning('未连接，无法同步重开')
+      return Notification.warning('未连接，无法同步重开')
     rtc.send({ type: 'reset' })
   }
   newGame()
-}
-
-async function copyText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制到剪贴板')
-  }
-  catch {
-    ElMessage.error('复制失败，请手动选择文本')
-  }
 }
 
 onMounted(() => {
@@ -190,22 +179,7 @@ onMounted(() => {
 
 <template>
   <div class="page-wrap">
-    <header class="mb-5 flex items-center justify-between gap-3">
-      <div>
-        <p class="m-0 text-xs text-[color:var(--app-text-muted)] font-bold tracking-[0.18em] uppercase">
-          Gomoku · 五子棋
-        </p>
-        <h1 class="m-0 text-2xl text-[color:var(--app-text)] sm:text-3xl">
-          15×15 · 五连即胜
-        </h1>
-      </div>
-      <el-button text @click="$router.push('/')">
-        <template #icon>
-          <i class="i-carbon-arrow-left" />
-        </template>
-        返回大厅
-      </el-button>
-    </header>
+    <GamePageHeader title="五子棋" subtitle="15×15 · 五连即胜" color="app-yellow" icon="Bear" />
 
     <div class="grid gap-5 lg:grid-cols-[auto_1fr]">
       <section class="board-wrap">
@@ -229,22 +203,23 @@ onMounted(() => {
       </section>
 
       <aside class="flex flex-col gap-4">
-        <el-card shadow="never" class="panel-card">
+        <GamePanel>
           <template #header>
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <div fc gap-2>
-                <span class="font-semibold">对局状态</span>
-                <el-tag v-if="aiThinking" type="warning" effect="light">
+                <IslandTitle variant="tab" color="app-teal" size="small">
+                  对局状态
+                </IslandTitle>
+                <IslandTag v-if="aiThinking" color="app-orange" variant="soft">
                   AI 思考中…
-                </el-tag>
+                </IslandTag>
               </div>
-              <el-tag
-                :type="status === 'win' ? 'success' : status === 'draw' ? 'info' : 'warning'"
-                effect="light"
-                round
+              <IslandTag
+                :color="status === 'win' ? 'app-green' : status === 'draw' ? 'app-blue' : 'app-orange'"
+                variant="soft"
               >
                 {{ turnLabel }}
-              </el-tag>
+              </IslandTag>
             </div>
           </template>
           <div class="grid grid-cols-3 gap-3 text-center">
@@ -274,155 +249,36 @@ onMounted(() => {
             </div>
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
-            <el-button type="primary" w-full @click="requestReset">
+            <IslandButton type="primary" w-full @click="requestReset">
               <template #icon>
                 <i class="i-carbon-restart" />
               </template>
               重新开始
-            </el-button>
+            </IslandButton>
           </div>
-        </el-card>
+        </GamePanel>
 
-        <el-card shadow="never" class="panel-card">
+        <GamePanel>
           <template #header>
-            <span class="font-semibold">游戏模式</span>
+            <IslandTitle variant="tab" color="app-yellow" size="small">
+              游戏模式
+            </IslandTitle>
           </template>
-          <el-radio-group v-model="mode" w-full flex items-center justify-evenly gap-6>
-            <el-radio
-              v-for="opt in modeOptions"
-              :key="opt.value"
-              :value="opt.value"
-              class="items-start !m-0 !h-auto"
-            >
-              <span class="font-medium">{{ opt.label }}</span>
-            </el-radio>
-          </el-radio-group>
+          <IslandRadio v-model="mode" :options="modeOptions" aria-label="游戏模式" />
 
           <div v-if="mode === 'pve'" class="mt-4 fc">
-            <el-radio-group v-model="aiSelf">
-              <el-radio-button :value="2">
-                AI 执白（你先手）
-              </el-radio-button>
-              <el-radio-button :value="1">
-                AI 执黑（你后手）
-              </el-radio-button>
-            </el-radio-group>
+            <IslandRadio
+              v-model="aiSelf"
+              :options="[
+                { value: 2, label: 'AI 执白（你先手）' },
+                { value: 1, label: 'AI 执黑（你后手）' },
+              ]"
+              aria-label="AI 先后手"
+            />
           </div>
-        </el-card>
+        </GamePanel>
 
-        <el-card v-if="mode === 'online'" shadow="never" class="panel-card">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <div fc gap-2>
-                <span class="font-semibold">联机对战</span>
-                <el-button
-                  v-if="rtc.role.value"
-                  size="small"
-                  plain
-                  type="danger"
-                  @click="rtc.reset()"
-                >
-                  断开并重置
-                </el-button>
-              </div>
-              <el-tag
-                size="small"
-                :type="rtc.status.value === 'connected' ? 'success' : rtc.status.value === 'error' ? 'danger' : 'info'"
-                effect="light"
-              >
-                {{ rtc.status.value }}
-              </el-tag>
-            </div>
-          </template>
-
-          <el-alert
-            v-if="rtc.errorMessage.value"
-            type="error"
-            :title="rtc.errorMessage.value"
-            class="mb-3"
-            :closable="false"
-            show-icon
-          />
-
-          <p class="m-0 text-xs text-[color:var(--app-text-muted)] leading-[1.7]">
-            通过 WebRTC 端到端直连，使用公共信令服务器交换房号。主机执黑先手。
-          </p>
-
-          <div v-if="!rtc.role.value" class="mt-3 flex flex-wrap gap-2">
-            <el-button type="primary" @click="rtc.createHost()">
-              <template #icon>
-                <i class="i-carbon-add-comment" />
-              </template>
-              创建房间
-            </el-button>
-            <el-button @click="rtc.role.value = 'guest'">
-              <template #icon>
-                <i class="i-carbon-link" />
-              </template>
-              加入房间
-            </el-button>
-          </div>
-
-          <!-- 主机视角：展示房号 -->
-          <template v-if="rtc.role.value === 'host'">
-            <div class="mt-4">
-              <div class="room-id-pill">
-                <template v-if="rtc.roomId.value">
-                  <span class="select-none font-mono">房号: {{ rtc.roomId.value }}</span>
-                  <i ml-2 cursor-pointer text-base class="i-carbon-copy" @click="copyText(rtc.roomId.value)" />
-                </template>
-
-                <el-icon v-else class="is-loading">
-                  <i class="i-carbon-circle-dash" />
-                </el-icon>
-              </div>
-              <div mt-4>
-                <el-alert v-if="rtc.status.value === 'awaiting-peer'" :closable="false">
-                  正在等待对方加入…
-                </el-alert>
-              </div>
-            </div>
-          </template>
-
-          <!-- 客机视角：输入房号 -->
-          <template v-if="rtc.role.value === 'guest'">
-            <div class="mt-2 fc gap-10">
-              <el-input
-                v-model="joinRoomInput"
-                placeholder=" 输入主机分享的 6 位房号"
-                maxlength="8"
-                @keyup.enter="rtc.joinRoom(joinRoomInput)"
-              />
-              <el-button
-                type="primary"
-                :disabled="!joinRoomInput || rtc.status.value === 'connecting'"
-                :loading="rtc.status.value === 'connecting'"
-                @click="rtc.joinRoom(joinRoomInput)"
-              >
-                加入房间
-              </el-button>
-            </div>
-
-            <div v-if="rtc.status.value === 'connecting'" class="mt-4">
-              <el-alert
-                type="info"
-                :closable="false"
-                show-icon
-                title="正在加入房间，请稍候…"
-              />
-            </div>
-
-            <div v-else-if="rtc.status.value === 'connected'" class="mt-4">
-              <el-alert
-                type="success"
-                :closable="false"
-                show-icon
-                :title="`已加入房间 ${rtc.roomId.value}`"
-                description="你当前执白后手，可以开始对局。"
-              />
-            </div>
-          </template>
-        </el-card>
+        <OnlineRoomPanel v-if="mode === 'online'" :rtc="rtc" host-label="执黑" guest-label="执白" @join="rtc.role.value = 'guest'" />
       </aside>
     </div>
   </div>
@@ -443,7 +299,7 @@ onMounted(() => {
   box-shadow: 0 24px 40px rgba(40, 23, 8, 0.18);
 }
 .board {
-  --cell: clamp(20px, 4.2vw, 36px);
+  --cell: clamp(16px, calc((100vw - 70px) / 15), 36px);
   --line: var(--gomoku-line);
   display: grid;
   grid-template-columns: repeat(var(--size), var(--cell));
@@ -506,20 +362,5 @@ onMounted(() => {
 .stone-white {
   background: radial-gradient(circle at 35% 30%, #fff, #c8c8d0 75%);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-.room-id-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 180px;
-  padding: 12px 20px;
-  border-radius: 14px;
-  background: var(--app-accent-soft);
-  color: var(--app-accent);
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: 0.32em;
-  font-family: 'SF Mono', 'JetBrains Mono', Menlo, monospace;
-  user-select: all;
 }
 </style>

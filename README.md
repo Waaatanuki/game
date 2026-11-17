@@ -15,7 +15,7 @@
 - Vite 8
 - TypeScript
 - Vue Router
-- Element Plus
+- [Animal Island Vue](https://github.com/guokaigdg/animal-island-vue) 1.6（按钮、卡片、标签、表单与通知）
 - UnoCSS
 - PeerJS / WebRTC
 - Antfu ESLint Flat Config
@@ -34,10 +34,20 @@ pnpm dev
 ```bash
 pnpm dev
 pnpm build
+pnpm typecheck
 pnpm lint
 pnpm lint:fix
 pnpm up
 ```
+
+## 界面组件
+
+- 组件按页面显式导入，样式统一在 `src/main.ts` 引入 `animal-island-vue/style`
+- 大厅使用 Animal Island `Background`、`Title` 和 `Icon`，搭配 `IslandScene` 小岛明信片与 `GamePreview` 棋盘预览
+- `GamePageHeader` 统一游戏页的动物徽章与便签标题；`GamePanel` 为 Card 添加统一页头，`OnlineRoomPanel` 复用房间表单与连接状态
+- `NotificationContainer` 在应用根节点挂载，页面通过 `Notification` 显示反馈
+- 保留浅色、深色和跟随系统三种主题；组件库深色适配集中在 `src/styles/animal-island.css`
+- 首次运行类型检查前先执行 `pnpm build`，生成自动导入声明
 
 ## 联机说明
 

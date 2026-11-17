@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Difficulty, SudokuBoard } from '~/games/sudoku/logic'
+import { Button as IslandButton, Tag as IslandTag, Title as IslandTitle, Notification } from 'animal-island-vue'
 import {
   DIFFICULTY_META,
   generatePuzzle,
@@ -211,11 +212,11 @@ function setValue(num: number) {
 
   if (num !== 0 && num !== solution.value[r][c]) {
     mistakes.value++
-    ElMessage.warning(`填入有误（${mistakes.value}/${MAX_MISTAKES}）`)
+    Notification.warning(`填入有误（${mistakes.value}/${MAX_MISTAKES}）`)
     if (mistakes.value >= MAX_MISTAKES) {
       status.value = 'lose'
       stopTimer()
-      ElMessage.error('错误次数已达上限，本局结束')
+      Notification.error('错误次数已达上限，本局结束')
     }
     return
   }
@@ -316,7 +317,7 @@ function checkWin() {
   if (isComplete(board.value, solution.value)) {
     status.value = 'win'
     stopTimer()
-    ElMessage.success(`🎉 完成！用时 ${formattedTime.value}`)
+    Notification.success(`🎉 完成！用时 ${formattedTime.value}`)
   }
 }
 
@@ -381,22 +382,7 @@ const statusLabel = computed(() => {
 
 <template>
   <div class="page-wrap">
-    <header class="mb-5 flex items-center justify-between gap-3">
-      <div>
-        <p class="m-0 text-xs text-[color:var(--app-text-muted)] font-bold tracking-[0.18em] uppercase">
-          Sudoku · 数独
-        </p>
-        <h1 class="m-0 text-2xl text-[color:var(--app-text)] sm:text-3xl">
-          9×9 · 逻辑推理填空
-        </h1>
-      </div>
-      <el-button text @click="$router.push('/')">
-        <template #icon>
-          <i class="i-carbon-arrow-left" />
-        </template>
-        返回大厅
-      </el-button>
-    </header>
+    <GamePageHeader title="数独" subtitle="9×9 · 给大脑放个小假" color="purple" icon="Owl" />
 
     <div class="grid gap-5 lg:grid-cols-[auto_1fr]">
       <section class="board-side">
@@ -432,7 +418,7 @@ const statusLabel = computed(() => {
         </div>
 
         <div class="numpad">
-          <button
+          <IslandButton
             v-for="n in 9"
             :key="n"
             class="num-btn"
@@ -441,22 +427,23 @@ const statusLabel = computed(() => {
             @click="setValue(n)"
           >
             {{ n }}
-          </button>
+          </IslandButton>
         </div>
       </section>
 
       <aside class="flex flex-col gap-4">
-        <el-card shadow="never" class="panel-card">
+        <GamePanel>
           <template #header>
-            <div class="flex items-center justify-between">
-              <span class="font-semibold">对局状态</span>
-              <el-tag
-                :type="status === 'win' ? 'success' : status === 'lose' ? 'danger' : 'warning'"
-                effect="light"
-                round
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <IslandTitle variant="tab" color="app-teal" size="small">
+                对局状态
+              </IslandTitle>
+              <IslandTag
+                :color="status === 'win' ? 'app-green' : status === 'lose' ? 'app-red' : 'app-orange'"
+                variant="soft"
               >
                 {{ statusLabel }}
-              </el-tag>
+              </IslandTag>
             </div>
           </template>
 
@@ -488,25 +475,29 @@ const statusLabel = computed(() => {
           </div>
 
           <div class="mt-4 flex flex-wrap gap-2">
-            <el-button type="primary" w-full @click="newGame()">
+            <IslandButton type="primary" w-full @click="newGame()">
               <template #icon>
                 <i class="i-carbon-restart" />
               </template>
               重新开始
-            </el-button>
+            </IslandButton>
           </div>
-        </el-card>
+        </GamePanel>
 
-        <el-card shadow="never" class="panel-card">
+        <GamePanel>
           <template #header>
-            <span class="font-semibold">难度</span>
+            <IslandTitle variant="tab" color="purple" size="small">
+              难度
+            </IslandTitle>
           </template>
           <div class="grid grid-cols-3 gap-2">
-            <button
+            <IslandButton
               v-for="d in DIFFICULTY_META"
               :key="d.value"
               class="diff-btn"
+              :type="difficulty === d.value ? 'primary' : 'default'"
               :class="{ active: difficulty === d.value }"
+              :aria-pressed="difficulty === d.value"
               @click="changeDifficulty(d.value)"
             >
               <div class="font-semibold">
@@ -515,31 +506,40 @@ const statusLabel = computed(() => {
               <div class="mt-1 text-xs opacity-70">
                 {{ d.desc }}
               </div>
-            </button>
+            </IslandButton>
           </div>
-        </el-card>
+        </GamePanel>
 
         <div class="action-bar">
-          <button class="action-btn" :disabled="!history.length" @click="undo">
-            <i class="i-carbon-undo" />
+          <IslandButton class="action-btn" :disabled="!history.length" @click="undo">
+            <template #icon>
+              <i class="i-carbon-undo" />
+            </template>
             <span>撤销</span>
-          </button>
-          <button class="action-btn" @click="eraseSelected">
-            <i class="i-carbon-erase" />
+          </IslandButton>
+          <IslandButton class="action-btn" @click="eraseSelected">
+            <template #icon>
+              <i class="i-carbon-erase" />
+            </template>
             <span>擦除</span>
-          </button>
-          <button
+          </IslandButton>
+          <IslandButton
             class="action-btn"
-            :class="{ active: noteMode }"
+            :type="noteMode ? 'primary' : 'default'"
+            :aria-pressed="noteMode"
             @click="toggleNoteMode"
           >
-            <i class="i-carbon-edit" />
+            <template #icon>
+              <i class="i-carbon-edit" />
+            </template>
             <span>笔记 {{ noteMode ? 'ON' : 'OFF' }}</span>
-          </button>
-          <button class="action-btn" @click="hint">
-            <i class="i-carbon-idea" />
+          </IslandButton>
+          <IslandButton class="action-btn" @click="hint">
+            <template #icon>
+              <i class="i-carbon-idea" />
+            </template>
             <span>提示</span>
-          </button>
+          </IslandButton>
         </div>
       </aside>
     </div>
@@ -567,7 +567,7 @@ const statusLabel = computed(() => {
   box-shadow: 0 24px 40px rgba(40, 23, 8, 0.18);
 }
 .board {
-  --cell: clamp(34px, 5.6vw, 54px);
+  --cell: clamp(24px, calc((100vw - 74px) / 9), 54px);
   display: grid;
   grid-template-columns: repeat(9, var(--cell));
   grid-template-rows: repeat(9, var(--cell));
@@ -658,103 +658,45 @@ html.dark .cell.edge-bottom {
 }
 
 .diff-btn {
+  height: auto;
+  min-height: 76px;
   padding: 12px 8px;
-  border-radius: 14px;
-  border: 1px solid var(--app-border);
-  background: var(--app-surface-soft);
-  color: var(--app-text);
-  cursor: pointer;
-  text-align: center;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    transform 0.2s ease;
-}
-.diff-btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--app-accent);
+  flex-direction: column;
+  gap: 0;
+  white-space: normal;
 }
 .diff-btn.active {
-  background: var(--app-accent-soft);
-  border-color: var(--app-accent);
-  color: var(--app-accent);
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
 }
-
 .numpad {
   display: grid;
-  grid-template-columns: repeat(9, 1fr);
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 6px;
   padding: 0 4px;
 }
 .num-btn {
-  height: 52px;
-  border-radius: 12px;
-  border: 1px solid var(--app-border);
-  background: var(--app-surface);
-  color: var(--app-accent);
+  height: 48px;
+  padding: 0;
   font-size: 22px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease,
-    opacity 0.15s ease;
-}
-.num-btn:hover:not(:disabled) {
-  background: var(--app-accent-soft);
-  transform: translateY(-1px);
-}
-.num-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.3;
-  background: var(--app-surface-soft);
 }
 .num-btn.done {
   color: var(--app-text-muted);
 }
-
 .action-bar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  padding: 0 4px;
 }
 .action-btn {
-  display: inline-flex;
+  height: auto;
+  min-height: 64px;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 4px;
   padding: 10px 6px;
-  border-radius: 12px;
-  border: 1px solid var(--app-border);
-  background: var(--app-surface);
-  color: var(--app-text);
   font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease,
-    opacity 0.15s ease;
 }
 .action-btn i {
   font-size: 20px;
-  color: var(--app-accent);
-}
-.action-btn:hover:not(:disabled) {
-  background: var(--app-accent-soft);
-  border-color: var(--app-accent);
-  transform: translateY(-1px);
-}
-.action-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-.action-btn.active {
-  background: var(--app-accent-soft);
-  border-color: var(--app-accent);
-  color: var(--app-accent);
 }
 </style>

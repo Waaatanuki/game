@@ -1,0 +1,104 @@
+/* 组件库 1.6 的组件色值部分编译自 Less，深色模式需要同时适配变量和组件。 */
+html.dark {
+  --animal-text-color: #ede9d5;
+  --animal-text-color-secondary: #bfc9b4;
+  --animal-text-color-disabled: #8d9a83;
+  --animal-bg-color: #344436;
+  --animal-bg-color-secondary: #3e5040;
+  --animal-bg-color-input: #344436;
+  --animal-bg-color-disabled: #3e5040;
+  --animal-border-color: #6a7b62;
+  --animal-border-color-light: #52634e;
+  --animal-shadow-warm: #1a281d;
+}
+
+.animal-input:focus-within {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+/* 折角标题中的文字保持对应色板，避免基础字体颜色覆盖飘带配色。 */
+.animal-title .animal-title__tab-text {
+  color: var(--rt);
+}
+
+html.dark .animal-card {
+  background-color: var(--app-surface);
+  color: var(--app-text);
+}
+
+html.dark .animal-card[class*='--pattern-'] {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.07) 1.5px, transparent 1.5px);
+}
+
+html.dark .animal-btn--default,
+html.dark .animal-btn--dashed,
+html.dark .animal-btn--primary {
+  color: var(--app-text);
+  background: var(--animal-bg-color);
+  border-color: var(--animal-border-color);
+}
+
+html.dark .animal-btn--primary {
+  box-shadow: 0 5px var(--animal-shadow-warm);
+}
+
+html.dark .animal-btn--primary:hover:not(:disabled) {
+  box-shadow: 0 6px var(--animal-shadow-warm);
+}
+
+html.dark .animal-btn--primary:active:not(:disabled) {
+  box-shadow: 0 1px var(--animal-shadow-warm);
+}
+
+html.dark .animal-btn--text,
+html.dark .animal-radio__label,
+html.dark .animal-input__inner,
+html.dark .animal-notification__title {
+  color: var(--app-text);
+}
+
+html.dark .animal-btn--text:hover:not(:disabled) {
+  background: var(--app-surface-soft);
+}
+
+html.dark .animal-btn--danger {
+  color: #ffa6a1;
+  border-color: #e05a5a;
+}
+
+html.dark .animal-input,
+html.dark .animal-radio__cbx input[type='radio'] {
+  background: var(--animal-bg-color);
+}
+
+html.dark .animal-radio--checked .animal-radio__cbx input[type='radio'] {
+  background: var(--animal-primary-color);
+}
+
+html.dark .animal-input__inner::placeholder,
+html.dark .animal-notification__description,
+html.dark .animal-notification__close {
+  color: var(--app-text-muted);
+}
+
+html.dark .animal-tag.animal-tag--soft {
+  background: color-mix(in srgb, var(--animal-tag-color, #aaa69d) 16%, var(--animal-bg-color));
+  color: var(--animal-tag-color, #d4c9b4);
+}
+
+html.dark .animal-tag.animal-tag--outlined {
+  color: var(--animal-tag-color, #d4c9b4);
+}
+
+html.dark .animal-notification {
+  background: var(--animal-bg-color);
+  color: var(--app-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animal-btn,
+  .animal-card {
+    transition: none;
+  }
+}

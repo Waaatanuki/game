@@ -46,8 +46,12 @@ export function useWebRTC() {
 
   function bindConnection(c: DataConnection) {
     conn = c
-    c.on('open', () => { status.value = 'connected' })
-    c.on('close', () => { status.value = 'closed' })
+    c.on('open', () => {
+      status.value = 'connected'
+    })
+    c.on('close', () => {
+      status.value = 'closed'
+    })
     c.on('error', err => setError(err?.message || '连接错误'))
     c.on('data', (data) => {
       try {
@@ -155,9 +159,13 @@ export function useWebRTC() {
   }
 
   function reset() {
-    try { conn?.close() }
+    try {
+      conn?.close()
+    }
     catch {}
-    try { peer?.destroy() }
+    try {
+      peer?.destroy()
+    }
     catch {}
     conn = null
     peer = null
@@ -168,7 +176,9 @@ export function useWebRTC() {
     lastMessage.value = null
   }
 
-  onBeforeUnmount(() => { reset() })
+  onBeforeUnmount(() => {
+    reset()
+  })
 
   return {
     role,

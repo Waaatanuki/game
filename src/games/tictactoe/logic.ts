@@ -59,7 +59,8 @@ function minimax(board: Board, self: Stone, current: Stone, depth: number): numb
         board[r][c] = self
         const s = minimax(board, self, opp, depth + 1)
         board[r][c] = 0
-        if (s > best) best = s
+        if (s > best)
+          best = s
       }
     }
     return best
@@ -73,7 +74,8 @@ function minimax(board: Board, self: Stone, current: Stone, depth: number): numb
         board[r][c] = current
         const s = minimax(board, self, self, depth + 1)
         board[r][c] = 0
-        if (s < best) best = s
+        if (s < best)
+          best = s
       }
     }
     return best

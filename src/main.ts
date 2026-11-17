@@ -4,8 +4,8 @@ import App from './App.vue'
 import { router } from './router'
 import '@unocss/reset/tailwind.css'
 import 'virtual:uno.css'
-import 'element-plus/dist/index.css'
-import 'element-plus/theme-chalk/dark/css-vars.css'
+import 'animal-island-vue/style'
+import '~/styles/animal-island.css'
 import '~/style.css'
 
 createApp(App).use(router).mount('#app')

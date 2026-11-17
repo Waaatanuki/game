@@ -2,7 +2,6 @@ import { fileURLToPath, URL } from 'node:url'
 import Unocss from '@unocss/vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
 
@@ -17,11 +16,9 @@ export default defineConfig({
       dirs: ['src/composables'],
       dts: 'types/auto-imports.d.ts',
       vueTemplate: true,
-      resolvers: [ElementPlusResolver()],
     }),
     Components({
       dts: 'types/components.d.ts',
-      resolvers: [ElementPlusResolver()],
     }),
     Unocss(),
   ],
